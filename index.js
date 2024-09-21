@@ -53,8 +53,7 @@ app.get('/api/users', async (req, res) => {
 })
 
 app.post('/api/users/:_id/exercises', async (req, res) => {
-  const { description, duration } = req.body;
-  const date = req.body.date || null;
+  const { description, duration, date } = req.body;
   const { _id } = req.params;
   const user = await User.findById(_id);
 
@@ -63,7 +62,7 @@ app.post('/api/users/:_id/exercises', async (req, res) => {
     user_id: user._id,
     description,
     duration,
-    date: new Date(date).toDateString(),
+    date: date ? new Date(date).toDateString() : new Date()
   }
 
   const exerciseObj = new Exercise(obj)
@@ -75,14 +74,46 @@ app.post('/api/users/:_id/exercises', async (req, res) => {
     username: user.username,
     description: exercise.description,
     duration: exercise.duration,
-    date: new Date(date).toDateString(),
+    date: new Date(exercise.date).toDateString(),
   });
 })
 
-app.get('/api/users:_id/logs', async(req, res) => {
-  const {from, to, limit} = req.query;
-  const {_id} = req.params;
+app.get('/api/users/:_id/logs', async (req, res) => {
+  const { from, to, limit } = req.query;
+  const { _id } = req.params;
   const user = await User.findById(_id);
+  let dateObj = {};
+  if (from) {
+    dateObj["$gte"] = new Date(from);
+  }
+
+  if (to) {
+    dateObj["$lte"] = new Date(to);
+  }
+
+  let filter = {
+    user_id: _id
+  }
+
+  if (from || to) {
+    filter.date = dateObj;
+  }
+
+  const exercises = await Exercise.find(filter).limit(+limit || 10);
+  exercises.forEach(e => console.log(e.date.toDateString()));
+
+  const log = exercises.map(e => ({
+    description: e.description,
+    duration: e.duration,
+    date: e.date.toDateString()
+  }))
+
+  res.json({
+    username: user.username,
+    count: exercises.length,
+    _id: user._id,
+    log
+  })
 })
 
 const listener = app.listen(process.env.PORT || 3000, () => {
